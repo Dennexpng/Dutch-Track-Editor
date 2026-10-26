@@ -24,24 +24,38 @@ jobs:
           mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable \
              ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
 
-      - name: Debug-keystore aanmaken
+      - name: Android instellen
         run: |
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey \
-            -keypass android -keystore debug.keystore -storepass android \
-            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 \
-            -deststoretype pkcs12
-
-      - name: Godot-editorinstellingen voor Android
-        run: |
-          godot --headless --editor --quit || true
-          SETTINGS=$(ls ~/.config/godot/editor_settings-4*.tres | head -n 1)
-          {
-            echo 'export/android/android_sdk_path = "'"${ANDROID_HOME:-/root/android-sdk}"'"'
-            echo 'export/android/java_sdk_path = "'"${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"'"'
-            echo 'export/android/debug_keystore = "'"${GITHUB_WORKSPACE}"'/debug.keystore"'
-            echo 'export/android/debug_keystore_user = "androiddebugkey"'
-            echo 'export/android/debug_keystore_pass = "android"'
-          } >> "$SETTINGS"
+          SDK=""
+          for p in "$ANDROID_HOME" "$ANDROID_SDK_ROOT" /usr/lib/android-sdk /root/android-sdk /opt/android-sdk; do
+            if [ -n "$p" ] && [ -d "$p/platform-tools" ]; then SDK="$p"; break; fi
+          done
+          JAVA=$(dirname "$(dirname "$(readlink -f "$(which javac)")")")
+          KEY=/root/debug.keystore
+          if [ ! -f "$KEY" ]; then
+            keytool -keyalg RSA -genkeypair -alias androiddebugkey \
+              -keypass android -keystore "$KEY" -storepass android \
+              -dname "CN=Android Debug,O=Android,C=US" -validity 9999 \
+              -deststoretype pkcs12
+          fi
+          echo "SDK=$SDK"
+          echo "JAVA=$JAVA"
+          ls "$SDK" || true
+          ls "$SDK/cmdline-tools" || true
+          ls "$SDK/build-tools" || true
+          mkdir -p ~/.config/godot
+          for f in ~/.config/godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.3.tres; do
+            {
+              echo '[gd_resource type="EditorSettings" format=3]'
+              echo ''
+              echo '[resource]'
+              echo "export/android/android_sdk_path = \"$SDK\""
+              echo "export/android/java_sdk_path = \"$JAVA\""
+              echo "export/android/debug_keystore = \"$KEY\""
+              echo 'export/android/debug_keystore_user = "androiddebugkey"'
+              echo 'export/android/debug_keystore_pass = "android"'
+            } > "$f"
+          done
 
       - name: Project importeren
         run: godot --headless --import || true
