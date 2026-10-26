@@ -28,6 +28,8 @@ jobs:
 
       - name: Android SDK installeren
         run: |
+          apt-get update -qq
+          apt-get install -y -qq curl unzip
           mkdir -p $SDK/cmdline-tools
           curl -sSL -o /tmp/ct.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
           unzip -q /tmp/ct.zip -d $SDK/cmdline-tools
@@ -41,4 +43,40 @@ jobs:
           JAVA=$(dirname "$(dirname "$(readlink -f "$(which javac)")")")
           KEY=/root/debug.keystore
           if [ ! -f "$KEY" ]; then
-            keytool -keyalg RSA -genkeypair -alias andr
+            keytool -keyalg RSA -genkeypair -alias androiddebugkey \
+              -keypass android -keystore "$KEY" -storepass android \
+              -dname "CN=Android Debug,O=Android,C=US" -validity 9999 \
+              -deststoretype pkcs12
+          fi
+          echo "JAVA=$JAVA"
+          ls "$JAVA/bin" | head -n 20
+          mkdir -p ~/.config/godot
+          for f in ~/.config/godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.3.tres; do
+            {
+              echo '[gd_resource type="EditorSettings" format=3]'
+              echo ''
+              echo '[resource]'
+              echo "export/android/android_sdk_path = \"$SDK\""
+              echo "export/android/java_sdk_path = \"$JAVA\""
+              echo "export/android/debug_keystore = \"$KEY\""
+              echo 'export/android/debug_keystore_user = "androiddebugkey"'
+              echo 'export/android/debug_keystore_pass = "android"'
+            } > "$f"
+          done
+          cat ~/.config/godot/editor_settings-4.3.tres
+
+      - name: Project importeren
+        run: godot --headless --import || true
+
+      - name: APK bouwen
+        run: |
+          mkdir -p build/android
+          cat export_presets.cfg | head -n 12
+          godot --headless --verbose --export-debug "Android" build/android/spoorsandbox.apk
+
+      - name: APK uploaden als artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spoorsandbox-apk
+          path: build/android/spoorsandbox.apk
+          if-no-files-found: error
