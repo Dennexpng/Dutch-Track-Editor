@@ -1,0 +1,16 @@
+; Godot-projectbestand (handmatig opgesteld, geen editor nodig)
+config_version=5
+
+[application]
+config/name="Spoor Sandbox"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.3", "Mobile")
+
+[display]
+window/handheld/orientation=0
+
+[input_devices]
+pointing/emulate_mouse_from_touch=false
+
+[rendering]
+renderer/rendering_method="mobile"
